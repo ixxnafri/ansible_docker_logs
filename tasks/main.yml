@@ -1,0 +1,45 @@
+---
+# tasks file for ansible_docker_logs
+- name: Get list of running containers
+  command: docker ps -aq
+  register: running_container_list
+
+- name: Get name of each docker containers
+  command: "docker inspect --format '{{ '{{' }} .Name {{ '}} ' }}' {{ item }}"
+  with_items: '{{ running_container_list.stdout_lines }}'
+  register: container_file_name
+
+- name: Get directory of each docker containers
+  command: "docker inspect --format '{{ '{{' }} .LogPath {{ '}} ' }}' {{ item }}"
+  with_items: '{{ running_container_list.stdout_lines }}'
+  register: container_file_dir
+
+- name: Compact name to a list
+  set_fact:
+    container_list_name: "{{ container_list_name|default([]) + [ item.stdout ] }}"
+  with_items: "{{ container_file_name.results }}"
+
+
+- name: Compact directory to a list
+  set_fact:
+    container_list_dir: "{{ container_list_dir|default([]) + [ item.stdout ] }}"
+  with_items: "{{ container_file_dir.results }}"
+
+
+- name: Fetch logs from container
+  fetch:
+    src: '{{ item.1 | replace(" ", "") }}'
+    dest: '/tmp/docker_logs_{{ansible_date_time.iso8601}}{{ item.0 | replace(" ", "")}}'
+    flat: yes
+  with_together: 
+   - '{{ container_list_name }}'
+   - '{{ container_list_dir }}'
+
+
+
+
+# name: Get logs directory of container name
+
+# docker inspect --format='{{.LogPath}}' containername
+# docker inspect $(docker ps -aq) --format='{{json .Name }}:{{json .LogPath}}'
+# name: Copy to local machine
